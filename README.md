@@ -248,7 +248,7 @@ Stop `monitor.py` → restart it → open **Threat Log** tab — all previous th
 **Grandhi Abhishek**
 B.Tech Computer Science — Lovely Professional University | Cybersecurity Enthusiast
 
-- 📧 grandhiabhishek@gmail.com
+- 📧 grandhiabhishek487@gmail.com
 - 🔗 [linkedin.com/in/abhishek-grandhi-2556a3220](https://linkedin.com/in/abhishek-grandhi-2556a3220)
 
 Built this as a personal hands-on project coming from a background in fraud analysis and cybersecurity. Having worked as a Chargeback Fraud Analyst reviewing high-volume financial transaction records to detect anomalous patterns, and previously as a Cybersecurity Intern analysing system and web activity logs — I wanted to apply that same analytical thinking to network-level threat detection and build a tool that actually monitors a real machine in real time rather than just studying theory.
