@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Monitor v3.0 — Threat Intelligence</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg0: #0b0d0f;  --bg1: #111416;  --bg2: #181b1e;  --bg3: #1f2327;
+  --border: rgba(255,255,255,0.07);  --border2: rgba(255,255,255,0.13);
+  --t1: #dde1e5;  --t2: #7e8890;  --t3: #4a5259;
+  --red: #e05555;  --amber: #d48c10;  --green: #3da060;
+  --blue: #3d8fe0;  --teal: #28b4a0;  --purple: #9b6ddf;
+  --mono: 'Courier New', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --r: 8px;
+}
+
+body { font-family: var(--sans); background: var(--bg0); color: var(--t1); font-size: 13px; min-height: 100vh; }
+
+/* HEADER */
+.hdr { display:flex; align-items:center; justify-content:space-between; padding:11px 20px; border-bottom:0.5px solid var(--border); background:var(--bg1); position:sticky; top:0; z-index:100; }
+.hdr-title { font-size:14px; font-weight:500; letter-spacing:.03em; }
+.hdr-sub   { font-size:11px; color:var(--t2); margin-top:2px; }
+.dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; }
+.dot.green { background:var(--green); animation:blink 2s infinite; }
+.dot.red   { background:var(--red); }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.35} }
+
+/* TABS */
+.tabs { display:flex; border-bottom:0.5px solid var(--border); background:var(--bg1); padding:0 20px; overflow-x:auto; }
+.tab { padding:9px 15px; cursor:pointer; font-size:12px; font-weight:500; color:var(--t2); border-bottom:2px solid transparent; white-space:nowrap; transition:all .2s; user-select:none; }
+.tab.active { color:var(--t1); border-bottom-color:var(--blue); }
+.tab:hover  { color:var(--t1); }
+
+/* PANELS */
+.panel { display:none; padding:16px 20px; }
+.panel.active { display:block; }
+
+/* OFFLINE */
+#offline-banner { display:none; background:rgba(224,85,85,.12); border-bottom:0.5px solid var(--red); color:var(--red); font-size:12px; padding:9px 20px; text-align:center; }
+
+/* METRICS */
+.metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:18px; }
+.mc { background:var(--bg2); border-radius:var(--r); border:0.5px solid var(--border); padding:13px; }
+.mc .v { font-size:22px; font-weight:500; line-height:1; }
+.mc .l { font-size:11px; color:var(--t2); margin-top:5px; }
+.mc.red    .v { color:var(--red); }
+.mc.amber  .v { color:var(--amber); }
+.mc.green  .v { color:var(--green); }
+.mc.blue   .v { color:var(--blue); }
+.mc.teal   .v { color:var(--teal); }
+.mc.purple .v { color:var(--purple); }
+
+/* SECTION */
+.sec { font-size:11px; font-weight:500; color:var(--t2); text-transform:uppercase; letter-spacing:.09em; margin:18px 0 8px; }
+
+/* BADGES */
+.badge { padding:2px 8px; border-radius:4px; font-size:10px; font-weight:500; display:inline-block; white-space:nowrap; }
+.badge.crit   { background:#3a1212; color:#f08080; }
+.badge.high   { background:#2e1c07; color:#eda850; }
+.badge.med    { background:#0d2040; color:#6aaeed; }
+.badge.low    { background:#0c2415; color:#5dc87a; }
+.badge.ok     { background:#0c2415; color:#5dc87a; }
+.badge.info   { background:#0d1f30; color:#5aaedd; }
+.badge.purple { background:#1e143a; color:#b48af0; }
+.badge.gray   { background:#1e2226; color:#8a9199; }
+
+/* TABLES */
+.tw { overflow-x:auto; }
+.tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.tbl th { font-size:10px; color:var(--t3); text-align:left; padding:5px 10px; border-bottom:0.5px solid var(--border); font-weight:500; text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
+.tbl td { padding:7px 10px; border-bottom:0.5px solid var(--border); vertical-align:top; }
+.tbl tr:hover td { background:var(--bg2); }
+.tbl tr.mal td  { background:rgba(224,85,85,.07); }
+.tbl tr.mal td:first-child { border-left:2px solid var(--red); }
+.tbl tr.sus td  { background:rgba(212,140,16,.05); }
+.tbl tr.sus td:first-child { border-left:2px solid var(--amber); }
+
+/* CONTROLS */
+.ctrl { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.ctrl input, .ctrl select { font-size:12px; padding:5px 10px; border-radius:6px; border:0.5px solid var(--border2); background:var(--bg2); color:var(--t1); outline:none; }
+.btn { padding:5px 13px; border-radius:6px; border:0.5px solid var(--border2); background:var(--bg2); color:var(--t1); cursor:pointer; font-size:12px; font-weight:500; transition:all .15s; white-space:nowrap; }
+.btn:hover  { background:var(--bg3); }
+.btn.primary { background:var(--blue); color:#fff; border-color:var(--blue); }
+.btn.primary:hover { opacity:.85; }
+.btn.danger  { border-color:var(--red); color:var(--red); }
+.btn.danger:hover { background:rgba(224,85,85,.1); }
+.btn.export  { border-color:var(--green); color:var(--green); }
+
+/* CHARTS */
+.chart-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin-bottom:18px; }
+.chart-card { background:var(--bg2); border-radius:var(--r); border:0.5px solid var(--border); padding:13px; }
+.chart-card .ct { font-size:11px; color:var(--t2); margin-bottom:8px; }
+
+/* THREAT LOG */
+.threat-item { border-bottom:0.5px solid var(--border); padding:10px 0; }
+.threat-header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
+.threat-title  { font-weight:500; font-size:13px; color:var(--t1); }
+.threat-detail { font-size:11px; color:var(--t2); line-height:1.5; }
+.threat-meta   { font-size:10px; color:var(--t3); margin-top:3px; font-family:var(--mono); }
+
+/* HARDWARE CARDS */
+.hw-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+.hw-card { background:var(--bg2); border-radius:var(--r); border:0.5px solid var(--border); padding:13px; }
+.hw-card.critical { border-color:var(--red); background:rgba(224,85,85,.06); }
+.hw-card.high     { border-color:var(--amber); background:rgba(212,140,16,.05); }
+.hw-name  { font-size:13px; font-weight:500; margin-bottom:4px; }
+.hw-type  { font-size:11px; color:var(--t2); }
+.hw-conns { font-size:11px; color:var(--red); margin-top:5px; }
+
+/* PAGINATION */
+.pager { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12px; color:var(--t2); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+
+/* EMPTY */
+.empty { text-align:center; padding:30px; color:var(--t3); font-size:12px; }
+
+/* STATS GRID */
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; }
+.stat-card  { background:var(--bg2); border-radius:var(--r); border:0.5px solid var(--border); padding:10px 14px; }
+.stat-label { font-size:11px; color:var(--t3); margin-bottom:4px; }
+.stat-value { font-size:14px; font-weight:500; }
+
+/* REP meter */
+.rep-bar { height:6px; border-radius:3px; background:var(--bg3); overflow:hidden; margin-top:4px; }
+.rep-fill { height:100%; border-radius:3px; transition:width .4s; }
+</style>
+</head>
+<body>
+
+<div id="offline-banner">⚠ Cannot reach monitor.py — run: <code>python monitor.py</code></div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <div class="hdr-title"><span class="dot green" id="status-dot"></span>Network Monitor v3.0 — Threat Intelligence</div>
+    <div class="hdr-sub" id="hdr-sub">Connecting…</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span style="font-family:var(--mono);font-size:11px;color:var(--t2)" id="live-clock"></span>
+    <span class="badge info" id="conn-badge">–</span>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="tab('overview')">Overview</div>
+  <div class="tab" onclick="tab('threats')">
+    Threat Log
+    <span id="threat-badge" style="background:#3a1212;color:#f08080;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px">0</span>
+  </div>
+  <div class="tab" onclick="tab('connections')">Connections</div>
+  <div class="tab" onclick="tab('hardware')">
+    Hardware Access
+    <span id="hw-badge" style="background:#1e143a;color:#b48af0;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px">0</span>
+  </div>
+  <div class="tab" onclick="tab('processes')">Processes</div>
+  <div class="tab" onclick="tab('ports')">Open Ports</div>
+  <div class="tab" onclick="tab('wifi')">WiFi Devices</div>
+  <div class="tab" onclick="tab('sysinfo')">System Info</div>
+</div>
+
+<!-- ════════ OVERVIEW ════════ -->
+<div class="panel active" id="panel-overview">
+  <div class="metrics" id="ov-metrics">
+    <div class="mc red">   <div class="v" id="m-threats">0</div><div class="l">Saved Threats</div></div>
+    <div class="mc red">   <div class="v" id="m-crit">0</div>   <div class="l">Critical Today</div></div>
+    <div class="mc amber"> <div class="v" id="m-cpu">–</div>    <div class="l">CPU %</div></div>
+    <div class="mc amber"> <div class="v" id="m-mem">–</div>    <div class="l">Memory %</div></div>
+    <div class="mc teal">  <div class="v" id="m-recv">–</div>   <div class="l">Download KB/s</div></div>
+    <div class="mc green"> <div class="v" id="m-sent">–</div>   <div class="l">Upload KB/s</div></div>
+    <div class="mc blue">  <div class="v" id="m-conns">–</div>  <div class="l">Connections</div></div>
+    <div class="mc purple"><div class="v" id="m-hw">0</div>     <div class="l">HW Accesses</div></div>
+  </div>
+
+  <div class="chart-row">
+    <div class="chart-card"><div class="ct">CPU %</div><div style="position:relative;height:110px"><canvas id="ch-cpu"></canvas></div></div>
+    <div class="chart-card"><div class="ct">Memory %</div><div style="position:relative;height:110px"><canvas id="ch-mem"></canvas></div></div>
+    <div class="chart-card"><div class="ct">Network KB/s (↓ down / ↑ up)</div><div style="position:relative;height:110px"><canvas id="ch-net"></canvas></div></div>
+  </div>
+
+  <!-- Recent critical threats -->
+  <div class="sec">Recent Critical / High Threats</div>
+  <div id="ov-recent-threats"></div>
+
+  <div class="sec">Network Interfaces</div>
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Interface</th><th>IPv4</th><th>Netmask</th><th>MAC</th><th>Speed</th><th>Status</th></tr></thead>
+      <tbody id="iface-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════ THREAT LOG ════════ -->
+<div class="panel" id="panel-threats">
+  <div class="ctrl">
+    <select id="tl-sev">
+      <option value="all">All severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <select id="tl-cat">
+      <option value="all">All categories</option>
+      <option value="Threat Intel">Threat Intel</option>
+      <option value="Hardware Surveillance">Hardware Surveillance</option>
+      <option value="Restricted Site">Restricted Site</option>
+      <option value="Open Port">Open Port</option>
+      <option value="Process">Process</option>
+      <option value="System">System</option>
+    </select>
+    <select id="tl-type">
+      <option value="all">All types</option>
+      <option value="malicious_ip">Malicious IP</option>
+      <option value="restricted_domain">Restricted Domain</option>
+      <option value="hardware_">Hardware Access</option>
+      <option value="malware_process">Malware Process</option>
+      <option value="suspicious_port">Suspicious Port</option>
+    </select>
+    <input type="text" id="tl-search" placeholder="Search IP / domain / title…" style="flex:1;min-width:150px" oninput="renderThreats(1)">
+    <button class="btn export" onclick="exportThreats()">&#8659; Export JSON</button>
+    <button class="btn danger" onclick="clearThreats()">Clear All</button>
+  </div>
+
+  <!-- Saved-log notice -->
+  <div style="font-size:11px;color:var(--t2);margin-bottom:10px;padding:8px 12px;background:var(--bg2);border-radius:6px;border:0.5px solid var(--border)">
+    &#128190; All threats are <strong style="color:var(--t1)">automatically saved</strong> to
+    <code id="log-file-path" style="color:var(--teal)">threat_log.json</code>
+    — they persist across restarts. Total saved: <span id="tl-total">0</span>
+  </div>
+
+  <div id="threat-list"><div class="empty">No threats recorded yet.</div></div>
+  <div class="pager">
+    <button class="btn" id="pg-prev" onclick="pgChange(-1)">← Prev</button>
+    <span id="pg-info">Page 1</span>
+    <button class="btn" id="pg-next" onclick="pgChange(1)">Next →</button>
+    <span style="margin-left:auto;color:var(--t3)" id="pg-count"></span>
+  </div>
+</div>
+
+<!-- ════════ CONNECTIONS ════════ -->
+<div class="panel" id="panel-connections">
+  <div class="ctrl">
+    <input type="text" id="conn-search" placeholder="Filter IP / domain / process…" style="flex:1;min-width:150px" oninput="renderConnections()">
+    <select id="conn-filter" onchange="renderConnections()">
+      <option value="all">All</option>
+      <option value="malicious">Malicious only</option>
+      <option value="suspicious">Suspicious only</option>
+      <option value="external">External only</option>
+      <option value="established">ESTABLISHED</option>
+    </select>
+  </div>
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Process</th><th>PID</th><th>Proto</th><th>Local</th><th>Remote IP</th><th>Domain</th><th>Country</th><th>Score</th><th>Status</th><th>Flags</th></tr></thead>
+      <tbody id="conn-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════ HARDWARE ACCESS ════════ -->
+<div class="panel" id="panel-hardware">
+  <div style="font-size:12px;color:var(--t2);margin-bottom:14px;padding:10px 14px;background:var(--bg2);border-radius:var(--r);border:0.5px solid var(--border);line-height:1.6">
+    Detects processes accessing <strong style="color:var(--t1)">camera, microphone, GPU, USB</strong> and flags any that simultaneously have external network connections — a strong indicator of spyware or unauthorised surveillance.
+  </div>
+  <div class="hw-grid" id="hw-grid"><div class="empty">No hardware access detected.</div></div>
+
+  <div class="sec" style="margin-top:20px">Hardware-Related Threat Log</div>
+  <div id="hw-threat-list"></div>
+</div>
+
+<!-- ════════ PROCESSES ════════ -->
+<div class="panel" id="panel-processes">
+  <div class="ctrl">
+    <input type="text" id="proc-search" placeholder="Filter by name…" style="flex:1;min-width:140px" oninput="renderProcesses()">
+    <select id="proc-sort" onchange="renderProcesses()">
+      <option value="cpu">Sort: CPU</option>
+      <option value="mem">Sort: Memory</option>
+      <option value="name">Sort: Name</option>
+      <option value="conns">Sort: Connections</option>
+    </select>
+  </div>
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Process</th><th>PID</th><th>User</th><th>CPU%</th><th>Mem%</th><th>Connections</th><th>Status</th></tr></thead>
+      <tbody id="proc-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════ PORTS ════════ -->
+<div class="panel" id="panel-ports">
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>Port</th><th>Protocol</th><th>Address</th><th>Process</th><th>PID</th><th>Risk Note</th></tr></thead>
+      <tbody id="ports-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════ WiFi ════════ -->
+<div class="panel" id="panel-wifi">
+  <div class="tw">
+    <table class="tbl">
+      <thead><tr><th>IP Address</th><th>MAC</th><th>Type</th><th>Hostname</th><th>Status</th></tr></thead>
+      <tbody id="wifi-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ════════ SYSTEM INFO ════════ -->
+<div class="panel" id="panel-sysinfo">
+  <div class="stats-grid" id="sysinfo-grid"></div>
+  <div class="sec">Intelligence Sources</div>
+  <div class="stats-grid" id="intel-sources"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+'use strict';
+
+const API     = 'http://localhost:5000';
+const REFRESH = 4000;
+
+let D         = null;   // latest data snapshot
+let charts    = {};
+let connected = false;
+let tlPage    = 1;
+
+// ── CLOCK ──
+setInterval(() => {
+  const e = document.getElementById('live-clock');
+  if(e) e.textContent = new Date().toISOString().replace('T',' ').slice(0,19)+' UTC';
+}, 1000);
+
+// ── TAB ROUTING ──
+const TAB_NAMES = ['overview','threats','connections','hardware','processes','ports','wifi','sysinfo'];
+function tab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', TAB_NAMES[i]===name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id===`panel-${name}`));
+  if(D) renderTab(name);
+}
+function renderTab(name) {
+  if(name==='overview')     renderOverview();
+  else if(name==='threats')     renderThreats(tlPage);
+  else if(name==='connections') renderConnections();
+  else if(name==='hardware')    renderHardware();
+  else if(name==='processes')   renderProcesses();
+  else if(name==='ports')       renderPorts();
+  else if(name==='wifi')        renderWifi();
+  else if(name==='sysinfo')     renderSysinfo();
+}
+
+function activeTab() {
+  const t = document.querySelector('.tab.active');
+  return TAB_NAMES[[...document.querySelectorAll('.tab')].indexOf(t)] || 'overview';
+}
+
+// ── FETCH ──
+async function fetchAll() {
+  try {
+    const res = await fetch(`${API}/api/all`, {signal: AbortSignal.timeout(5000)});
+    if(!res.ok) throw new Error();
+    D = await res.json();
+
+    if(!connected) {
+      connected = true;
+      document.getElementById('offline-banner').style.display='none';
+      document.getElementById('status-dot').className='dot green';
+    }
+
+    const si = D.system_info||{};
+    document.getElementById('hdr-sub').textContent =
+      `${si.hostname||'?'} · ${si.local_ip||'?'} · ${si.os||'?'}`;
+    document.getElementById('conn-badge').textContent  = 'LIVE';
+    document.getElementById('conn-badge').className    = 'badge ok';
+    document.getElementById('threat-badge').textContent = D.total_alerts||0;
+    document.getElementById('hw-badge').textContent    = (D.hardware_access||[]).length;
+
+    renderTab(activeTab());
+
+  } catch(e) {
+    connected = false;
+    document.getElementById('offline-banner').style.display='block';
+    document.getElementById('status-dot').className='dot red';
+    document.getElementById('conn-badge').textContent='OFFLINE';
+    document.getElementById('conn-badge').className='badge crit';
+  }
+}
+
+// ── HELPERS ──
+function fmt_bytes(b) {
+  if(b>1e9) return (b/1e9).toFixed(2)+' GB';
+  if(b>1e6) return (b/1e6).toFixed(1)+' MB';
+  if(b>1e3) return (b/1e3).toFixed(0)+' KB';
+  return (b||0)+' B';
+}
+function sev_badge(s) {
+  const m={critical:'crit',high:'high',medium:'med',low:'low'};
+  return `<span class="badge ${m[s]||'gray'}">${s||'?'}</span>`;
+}
+function score_color(n) {
+  if(n>80) return 'var(--red)';
+  if(n>50) return 'var(--amber)';
+  return 'var(--t2)';
+}
+
+// ── CHART HELPER ──
+function updateChart(id, labels, d1, col1, d2, col2) {
+  const canvas = document.getElementById(id);
+  if(!canvas) return;
+  const datasets = [{
+    label: id, data:d1, borderColor:col1,
+    backgroundColor:col1+'22', borderWidth:1.5,
+    fill:true, tension:0.3, pointRadius:0
+  }];
+  if(d2) datasets.push({
+    label:'up', data:d2, borderColor:col2,
+    backgroundColor:col2+'22', borderWidth:1.5,
+    fill:true, tension:0.3, pointRadius:0
+  });
+  const opts = {
+    responsive:true, maintainAspectRatio:false, animation:false,
+    plugins:{legend:{display:!!d2}},
+    scales:{
+      x:{ticks:{display:false},grid:{color:'rgba(255,255,255,.03)'}},
+      y:{min:0, ticks:{color:'#4a5259',font:{size:10}}, grid:{color:'rgba(255,255,255,.03)'}}
+    }
+  };
+  if(charts[id]) {
+    charts[id].data.labels=labels;
+    charts[id].data.datasets[0].data=d1;
+    if(d2) charts[id].data.datasets[1].data=d2;
+    charts[id].update('none');
+  } else {
+    charts[id]=new Chart(canvas,{type:'line',data:{labels,datasets},options:opts});
+  }
+}
+
+// ── OVERVIEW ──
+function renderOverview() {
+  const cpu=D.cpu_history||[], mem=D.mem_history||[], ts=D.timestamps||[];
+  const ns=D.network_stats||{};
+  const lCPU=cpu[cpu.length-1]||0, lMem=mem[mem.length-1]||0;
+
+  document.getElementById('m-threats').textContent = D.total_alerts||0;
+  document.getElementById('m-cpu').textContent     = lCPU.toFixed(1)+'%';
+  document.getElementById('m-mem').textContent     = lMem.toFixed(1)+'%';
+  document.getElementById('m-recv').textContent    = (ns.recv_kbps||0).toFixed(1);
+  document.getElementById('m-sent').textContent    = (ns.sent_kbps||0).toFixed(1);
+  document.getElementById('m-conns').textContent   = (D.connections||[]).length;
+  document.getElementById('m-hw').textContent      = (D.hardware_access||[]).length;
+
+  // count today's critical
+  const today = new Date().toISOString().slice(0,10);
+  const crits = (D.threat_log||[]).filter(t=>t.severity==='critical'&&(t.timestamp||'').startsWith(today)).length;
+  document.getElementById('m-crit').textContent = crits;
+
+  updateChart('ch-cpu',ts,cpu,'#3d8fe0');
+  updateChart('ch-mem',ts,mem,'#d48c10');
+  updateChart('ch-net',ts,D.net_recv_history||[],'#28b4a0',D.net_sent_history||[],'#3da060');
+
+  // Recent critical/high
+  const recent = (D.threat_log||[]).filter(t=>t.severity==='critical'||t.severity==='high').slice(0,5);
+  document.getElementById('ov-recent-threats').innerHTML = recent.length
+    ? recent.map(t=>`
+        <div class="threat-item">
+          <div class="threat-header">
+            ${sev_badge(t.severity)}
+            <span class="badge gray">${t.category}</span>
+            <span class="threat-title">${t.title}</span>
+          </div>
+          <div class="threat-detail">${t.detail}</div>
+          <div class="threat-meta">${t.timestamp} ${t.ip?'· IP: '+t.ip:''} ${t.domain?'· '+t.domain:''}</div>
+        </div>`).join('')
+    : '<div class="empty">No critical/high threats yet.</div>';
+
+  // Interfaces
+  document.getElementById('iface-body').innerHTML = (D.interfaces||[]).flatMap(ifc=>{
+    const ipv4=ifc.addresses.filter(a=>a.type==='IPv4');
+    const mac=ifc.addresses.find(a=>a.type==='MAC');
+    return ipv4.length ? ipv4.map(a=>`
+      <tr>
+        <td style="color:var(--t2)">${ifc.name}</td>
+        <td style="font-family:var(--mono);color:var(--teal)">${a.address}</td>
+        <td style="font-family:var(--mono);color:var(--t3)">${a.netmask}</td>
+        <td style="font-family:var(--mono);color:var(--t3)">${mac?mac.address:'–'}</td>
+        <td>${ifc.speed_mbps?ifc.speed_mbps+' Mbps':'–'}</td>
+        <td><span class="badge ${ifc.is_up?'ok':'crit'}">${ifc.is_up?'UP':'DOWN'}</span></td>
+      </tr>`) : [];
+  }).join('') || '<tr><td colspan="6" class="empty">–</td></tr>';
+}
+
+// ── THREAT LOG ──
+let tlData = {threats:[], total:0, page:1, pages:1};
+
+async function renderThreats(page) {
+  tlPage = page;
+  const sev    = document.getElementById('tl-sev').value;
+  const cat    = document.getElementById('tl-cat').value;
+  const type   = document.getElementById('tl-type').value;
+  const search = document.getElementById('tl-search').value.trim();
+
+  try {
+    const params = new URLSearchParams({severity:sev,category:cat,type,page,per:50});
+    const res = await fetch(`${API}/api/threats?${params}`);
+    tlData = await res.json();
+  } catch(e) {
+    // fallback to in-memory
+    tlData = {
+      threats: (D&&D.threat_log||[]).slice((page-1)*50, page*50),
+      total:   (D&&D.threat_log||[]).length,
+      page, pages: Math.ceil((D&&D.threat_log||[]).length/50)||1
+    };
+  }
+
+  let items = tlData.threats;
+  if(search) {
+    const q = search.toLowerCase();
+    items = items.filter(t =>
+      (t.title||'').toLowerCase().includes(q) ||
+      (t.detail||'').toLowerCase().includes(q) ||
+      (t.ip||'').includes(q) ||
+      (t.domain||'').toLowerCase().includes(q)
+    );
+  }
+
+  document.getElementById('tl-total').textContent  = tlData.total;
+  document.getElementById('pg-info').textContent   = `Page ${tlData.page} of ${tlData.pages}`;
+  document.getElementById('pg-count').textContent  = `${tlData.total} total threats`;
+  document.getElementById('pg-prev').disabled      = tlData.page <= 1;
+  document.getElementById('pg-next').disabled      = tlData.page >= tlData.pages;
+
+  if(D) {
+    document.getElementById('log-file-path').textContent = D.log_file||'threat_log.json';
+  }
+
+  document.getElementById('threat-list').innerHTML = items.length
+    ? items.map(t => `
+        <div class="threat-item">
+          <div class="threat-header">
+            ${sev_badge(t.severity)}
+            <span class="badge gray">${t.category}</span>
+            ${t.threat_type?`<span class="badge info">${t.threat_type}</span>`:''}
+            <span class="threat-title">${t.title}</span>
+          </div>
+          <div class="threat-detail">${t.detail}</div>
+          <div class="threat-meta">
+            ${t.timestamp}
+            ${t.ip?` &nbsp;·&nbsp; IP: <span style="color:var(--red)">${t.ip}</span>`:''}
+            ${t.domain?` &nbsp;·&nbsp; <span style="color:var(--teal)">${t.domain}</span>`:''}
+            &nbsp;·&nbsp; ID: ${t.id||'–'}
+          </div>
+        </div>`)
+      .join('')
+    : '<div class="empty">No threats match filter.</div>';
+}
+
+function pgChange(d) { renderThreats(Math.max(1, Math.min(tlPage+d, tlData.pages))); }
+
+function exportThreats() {
+  window.open(`${API}/api/threats/export`,'_blank');
+}
+
+async function clearThreats() {
+  if(!confirm('Clear ALL saved threats? This cannot be undone.')) return;
+  await fetch(`${API}/api/threats/clear`, {method:'POST'});
+  tlData = {threats:[],total:0,page:1,pages:1};
+  if(D) { D.threat_log=[]; D.total_alerts=0; }
+  renderThreats(1);
+  document.getElementById('threat-badge').textContent = 0;
+}
+
+// ── CONNECTIONS ──
+function renderConnections() {
+  const search = (document.getElementById('conn-search').value||'').toLowerCase();
+  const filter = document.getElementById('conn-filter').value;
+
+  let rows = (D.connections||[]).filter(c => {
+    if(filter==='malicious'   && !c.malicious)  return false;
+    if(filter==='suspicious'  && !c.suspicious) return false;
+    if(filter==='external'    && !c.is_external) return false;
+    if(filter==='established' && c.status!=='ESTABLISHED') return false;
+    if(search && !c.process.toLowerCase().includes(search)
+              && !(c.raddr||'').includes(search)
+              && !(c.domain||'').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  document.getElementById('conn-body').innerHTML = rows.length
+    ? rows.map(c=>`
+        <tr class="${c.malicious?'mal':c.suspicious?'sus':''}">
+          <td style="font-weight:500">${c.process}</td>
+          <td style="color:var(--t3)">${c.pid||'–'}</td>
+          <td><span class="badge info">${c.protocol}</span></td>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--t2)">${c.laddr}</td>
+          <td style="font-family:var(--mono);font-size:11px;color:${c.malicious?'var(--red)':c.is_external?'var(--amber)':'var(--t1)'}">${c.rip||'–'}</td>
+          <td style="font-size:11px;color:var(--teal)">${c.domain||'–'}</td>
+          <td><span class="badge gray">${c.country||'–'}</span></td>
+          <td>
+            ${c.threat_score>0?`
+              <span style="font-weight:500;color:${score_color(c.threat_score)}">${c.threat_score}</span>
+              <div class="rep-bar"><div class="rep-fill" style="width:${c.threat_score}%;background:${score_color(c.threat_score)}"></div></div>`:'–'}
+          </td>
+          <td><span class="badge ${c.status==='ESTABLISHED'?'ok':c.status==='LISTEN'?'med':'gray'}">${c.status}</span></td>
+          <td style="font-size:11px;color:${c.malicious?'var(--red)':'var(--amber)'};max-width:200px">${(c.flags||[]).join(' · ')}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="10" class="empty">No connections match filter.</td></tr>';
+}
+
+// ── HARDWARE ACCESS ──
+function renderHardware() {
+  const hw = D.hardware_access||[];
+  document.getElementById('hw-grid').innerHTML = hw.length
+    ? hw.map(h=>`
+        <div class="hw-card ${h.risk}">
+          <div class="hw-name">${h.name} <span style="color:var(--t3);font-weight:400;font-size:11px">PID ${h.pid}</span></div>
+          <div class="hw-type">${h.hw_type} · ${h.username||'?'}</div>
+          <div style="margin-top:6px">${sev_badge(h.risk)}</div>
+          ${h.ext_conns&&h.ext_conns.length?`
+            <div class="hw-conns">&#9888; External connections:<br>
+              ${h.ext_conns.map(c=>`<code style="font-size:10px">${c}</code>`).join('<br>')}
+            </div>`:''}
+        </div>`)
+      .join('')
+    : '<div class="empty">No hardware access detected currently.</div>';
+
+  // Hardware threats from log
+  const hwThreats = (D.threat_log||[]).filter(t=>t.category==='Hardware Surveillance'||
+    (t.threat_type||'').startsWith('hardware_')).slice(0,20);
+  document.getElementById('hw-threat-list').innerHTML = hwThreats.length
+    ? hwThreats.map(t=>`
+        <div class="threat-item">
+          <div class="threat-header">
+            ${sev_badge(t.severity)}
+            <span class="badge purple">Hardware</span>
+            <span class="threat-title">${t.title}</span>
+          </div>
+          <div class="threat-detail">${t.detail}</div>
+          <div class="threat-meta">${t.timestamp} ${t.ip?' · '+t.ip:''}</div>
+        </div>`).join('')
+    : '<div class="empty">No hardware-related threats logged.</div>';
+}
+
+// ── PROCESSES ──
+function renderProcesses() {
+  const search = (document.getElementById('proc-search').value||'').toLowerCase();
+  const sort   = document.getElementById('proc-sort').value;
+  let procs = (D.processes||[]).filter(p =>
+    !search || p.name.toLowerCase().includes(search) || (p.username||'').toLowerCase().includes(search)
+  );
+  if(sort==='mem')   procs.sort((a,b)=>b.memory-a.memory);
+  else if(sort==='name')  procs.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sort==='conns') procs.sort((a,b)=>b.connections-a.connections);
+  else procs.sort((a,b)=>b.cpu-a.cpu);
+
+  document.getElementById('proc-body').innerHTML = procs.length
+    ? procs.map(p=>`
+        <tr class="${p.suspicious?'mal':''}">
+          <td style="font-weight:500;color:${p.suspicious?'var(--red)':'var(--t1)'}">${p.name}${p.suspicious?' ⚠':''}</td>
+          <td style="color:var(--t3)">${p.pid}</td>
+          <td style="color:var(--t2);font-size:11px">${p.username}</td>
+          <td style="color:${p.cpu>50?'var(--red)':p.cpu>20?'var(--amber)':'var(--t1)'}">${p.cpu.toFixed(1)}%</td>
+          <td style="color:${p.memory>10?'var(--amber)':'var(--t1)'}">${p.memory.toFixed(2)}%</td>
+          <td style="color:${p.connections>10?'var(--amber)':'var(--t2)'}">${p.connections}</td>
+          <td><span class="badge ${p.status==='running'?'ok':p.status==='sleeping'?'info':'gray'}">${p.status}</span></td>
+        </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">No processes found.</td></tr>';
+}
+
+// ── PORTS ──
+function renderPorts() {
+  document.getElementById('ports-body').innerHTML = (D.open_ports||[]).length
+    ? (D.open_ports||[]).map(p=>`
+        <tr class="${p.suspicious?'mal':''}">
+          <td style="font-weight:500;color:${p.suspicious?'var(--red)':'var(--teal)'}">${p.port}</td>
+          <td><span class="badge info">${p.protocol}</span></td>
+          <td style="font-family:var(--mono);color:var(--t2)">${p.address}</td>
+          <td style="font-weight:500">${p.process}</td>
+          <td style="color:var(--t3)">${p.pid}</td>
+          <td>${p.note?`<span class="badge ${p.suspicious?'crit':'high'}">${p.note}</span>`:'–'}</td>
+        </tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No open ports.</td></tr>';
+}
+
+// ── WiFi ──
+function renderWifi() {
+  document.getElementById('wifi-body').innerHTML = (D.wifi_devices||[]).length
+    ? (D.wifi_devices||[]).map(d=>`
+        <tr>
+          <td style="font-family:var(--mono);color:var(--teal)">${d.ip}</td>
+          <td style="font-family:var(--mono);color:var(--t2)">${d.mac}</td>
+          <td><span class="badge info">${d.type||'–'}</span></td>
+          <td style="color:var(--t2)">${d.hostname||'–'}</td>
+          <td><span class="badge ${d.suspicious?'crit':'ok'}">${d.suspicious?'Suspicious':'OK'}</span></td>
+        </tr>`).join('')
+    : '<tr><td colspan="5" class="empty">No devices found — run as Administrator for full ARP table.</td></tr>';
+}
+
+// ── SYSINFO ──
+function renderSysinfo() {
+  const si = D.system_info||{};
+  const fields = [
+    ['Hostname',       si.hostname],
+    ['Local IP',       si.local_ip],
+    ['OS',             si.os],
+    ['Architecture',   si.machine],
+    ['Processor',      si.processor],
+    ['Boot Time',      si.boot_time],
+    ['CPU Cores (logical)',  si.cpu_count],
+    ['CPU Cores (physical)', si.cpu_physical],
+    ['RAM Total',      si.ram_total_gb ? si.ram_total_gb+' GB' : '–'],
+    ['Python Version', si.python_ver],
+    ['Server Time',    D.server_time],
+  ];
+  document.getElementById('sysinfo-grid').innerHTML = fields.map(([k,v])=>`
+    <div class="stat-card">
+      <div class="stat-label">${k}</div>
+      <div class="stat-value" style="color:var(--t1)">${v||'–'}</div>
+    </div>`).join('');
+
+  document.getElementById('intel-sources').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">AbuseIPDB</div>
+      <div class="stat-value" style="color:${D.abuseipdb_active?'var(--green)':'var(--amber)'}">
+        ${D.abuseipdb_active?'Live checks enabled':'Offline mode (add API key)'}
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">URLhaus Feed</div>
+      <div class="stat-value" style="color:var(--green)">Auto-updated hourly</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Local Blocklist</div>
+      <div class="stat-value" style="color:var(--green)">Active</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Threat Log File</div>
+      <div class="stat-value" style="color:var(--teal);font-size:11px;word-break:break-all">${D.log_file||'–'}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Scapy Packet Capture</div>
+      <div class="stat-value" style="color:${D.scapy_available?'var(--green)':'var(--t2)'}">
+        ${D.scapy_available?'Enabled':'Not installed'}
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Saved Threats</div>
+      <div class="stat-value" style="color:var(--red)">${D.total_alerts||0}</div>
+    </div>`;
+}
+
+// ── BOOT ──
+fetchAll();
+setInterval(fetchAll, REFRESH);
+</script>
+</body>
+</html>
